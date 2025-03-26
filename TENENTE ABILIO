@@ -1,0 +1,115 @@
+function checkFoldersAndSendEmail_EMEB_TenenteAbilio() {
+    const schoolName = "EMEB Tenente Abílio da Silva Morães SUL";
+    const responsiblePerson = "ADNILSE SOUZA DA SILVA SIQUEIRA";
+    const emailRecipient = "luisfelipesouzadesouza@gmail.com";
+    
+    const folderSchedule = {
+        "1ª Quinzena Abril": "12PvQO7n2wSFPG-NbqD6VeyaXOMbnOtM8", 
+        "2ª Quinzena Abril": "12TUXLCs9dbLLO7o3_kt0Uo7NV1Ltli3x", 
+        "1ª Quinzena Maio": "12J2BCs5HsWQ9GTPbXGq_-4VR8BqI-ggt",
+        "2ª Quinzena Maio": "12HwSrAhrPpoSPzWZMAzSITs5IXR-Q8-4", 
+        "1ª Quinzena Junho": "12DTbraFMjz4h7JaqQOezxwcAt2KyYzfi", 
+        "2ª Quinzena Junho": "129cYCQJx81r-3J45o7roqiccoX4Zpc3V", 
+        "1ª Quinzena Julho": "123o2gqdkrvMJLf7tTDSzQnDY-Efiai7A", 
+        "2ª Quinzena Julho": "11uFgeFeRHBVwImiEEKf1O2oP8_1WlxIQ", 
+        "1ª Quinzena Agosto": "11t47wDOtzaOlEKwGvhfFXspvQq_IlhpR", 
+        "2ª Quinzena Agosto": "11rrK0EoWWHxp0yYDfwBhl2h6xIpFzIZz", 
+        "1ª Quinzena Setembro": "11pmfGEaAf1RnIzYYF1IclpbZYh4_D5uk", 
+        "2ª Quinzena Setembro": "11lZfFcuKOJQTElO0CzbsyY2fu9rpFpDP", 
+        "1ª Quinzena Outubro": "11l8qT0fR1T_AeFJewpjGax9Q2FyeYkC7", 
+        "2ª Quinzena Outubro": "11ioXgkXJxmxaw1m6pHytMN3-8tHp0C6W", 
+        "1ª Quinzena Novembro": "11bsaqtc_StuMaCuCSr_0cEw2WExnjHfO"
+    };
+    
+    const requiredFiles = ["Apoio Língua Portuguesa", "Apoio Matemática", "Educação Física", "Teatro"];
+    
+    let today = new Date();
+    let currentCycle = getCurrentCycle(today);
+    let nextCycle = getNextCycle(today);
+    
+    let missingReports = [];
+    let dailyIncompleteFolders = [];
+    let weeklyIncompleteFolders = [];
+    
+    for (let period in folderSchedule) {
+        let folderId = folderSchedule[period];
+        let folder = DriveApp.getFolderById(folderId);
+        let files = folder.getFiles();
+        let fileNames = [];
+        
+        while (files.hasNext()) {
+            fileNames.push(files.next().getName());
+        }
+        
+        let missingFiles = requiredFiles.filter(req => !fileNames.some(name => name.includes(req)));
+        
+        if (missingFiles.length > 0) {
+            let report = `📁 ${period} está incompleto. Faltam:\n - ${missingFiles.join("\n - ")}`;
+            if (period === currentCycle) {
+                dailyIncompleteFolders.push(report);
+            } else if (period === nextCycle) {
+                weeklyIncompleteFolders.push(report);
+            }
+        }
+    }
+    
+    if (dailyIncompleteFolders.length > 0 || weeklyIncompleteFolders.length > 0) {
+        let subject = `🚨 Relatório de Gestão Automatizada - ${schoolName}`;
+        let body = `🚨 **Atenção, ${responsiblePerson}!**\n\n`;
+        body += `O sistema de gestão automatizada do Google Drive identificou pendências nos planos de aula.\n\n`;
+        
+        if (dailyIncompleteFolders.length > 0) {
+            body += `📌 **Notificação Diária - Quinzena Vigente:**\n${dailyIncompleteFolders.join("\n\n")}\n\n`;
+        }
+        
+        if (weeklyIncompleteFolders.length > 0) {
+            body += `📌 **Notificação Semanal - Próxima Quinzena:**\n${weeklyIncompleteFolders.join("\n\n")}\n\n`;
+        }
+        
+        body += `📢 Para evitar notificações, insira os planos pendentes até o prazo estipulado. Em caso de dúvidas, contate o gestor do programa ETA.\n`;
+        
+        MailApp.sendEmail({
+            to: emailRecipient,
+            subject: subject,
+            body: body
+        });
+        
+        Logger.log("E-mail de notificação enviado.");
+    } else {
+        Logger.log("Todas as pastas verificadas estão completas.");
+    }
+}
+
+function getCurrentCycle(today) {
+    let monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+    let month = monthNames[today.getMonth()];
+    let cycle = today.getDate() <= 15 ? "1ª Quinzena" : "2ª Quinzena";
+    return `${cycle} ${month}`;
+}
+
+function getNextCycle(today) {
+    let nextDate = new Date(today);
+    nextDate.setDate(16);
+    if (today.getDate() > 15) {
+        nextDate.setMonth(today.getMonth() + 1);
+        nextDate.setDate(1);
+    }
+    return getCurrentCycle(nextDate);
+}
+
+function scheduleNotifications_EMEB_TenenteAbilio() {
+    let triggers = ScriptApp.getProjectTriggers();
+    for (let trigger of triggers) {
+        if (trigger.getHandlerFunction() === "checkFoldersAndSendEmail_EMEB_TenenteAbilio") {
+            ScriptApp.deleteTrigger(trigger);
+        }
+    }
+    
+    ScriptApp.newTrigger("checkFoldersAndSendEmail_EMEB_TenenteAbilio")
+        .timeBased()
+        .everyDays(1)
+        .atHour(8)
+        .create();
+    
+    Logger.log("Notificações programadas para rodar diariamente às 8h.");
+}
